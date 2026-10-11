@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS node
+FROM node:25-bookworm-slim AS node
 FROM php:8.5-fpm-bookworm
 
 # Arguments defined in docker-compose.yml
