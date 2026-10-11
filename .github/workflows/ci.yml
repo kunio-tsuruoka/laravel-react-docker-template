@@ -1,0 +1,48 @@
+name: Template CI
+
+on:
+  push:
+    branches: [main, 'chore/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          cp .env.example src/.env
+          docker compose config --quiet
+      - name: Build PHP and Node image
+        run: docker compose build --build-arg uid="$(id -u)" app
+      - name: Start services
+        run: docker compose up -d --wait
+      - name: Install locked dependencies
+        run: |
+          docker compose exec -T app composer validate --strict
+          docker compose exec -T app composer install --no-interaction --prefer-dist --no-progress
+          docker compose exec -T app composer check-platform-reqs
+          docker compose exec -T app npm ci
+      - name: Build and test
+        run: |
+          docker compose exec -T app php artisan key:generate
+          docker compose exec -T app npm run build
+          docker compose exec -T app composer test
+          docker compose exec -T app php artisan migrate --force
+          curl --fail --retry 10 --retry-delay 2 --retry-connrefused http://localhost:8080/login
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop services
+        if: always()
+        run: docker compose down
