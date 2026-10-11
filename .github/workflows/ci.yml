@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, 'chore/**']
   pull_request:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,7 +27,7 @@ jobs:
           cp .env.example src/.env
           docker compose config --quiet
       - name: Build PHP and Node image
-        run: docker compose build --build-arg uid="$(id -u)" app
+        run: docker compose build --pull --build-arg uid="$(id -u)" app
       - name: Start services
         run: docker compose up -d --wait
       - name: Install locked dependencies
@@ -33,6 +36,10 @@ jobs:
           docker compose exec -T app composer install --no-interaction --prefer-dist --no-progress
           docker compose exec -T app composer check-platform-reqs
           docker compose exec -T app npm ci
+      - name: Audit locked dependencies
+        run: |
+          docker compose exec -T app composer audit --locked --abandoned=fail
+          docker compose exec -T app npm audit --audit-level=low
       - name: Build and test
         run: |
           docker compose exec -T app php artisan key:generate

@@ -57,11 +57,15 @@ docker compose exec app npm run build
 docker compose exec app composer test
 docker compose exec app composer validate --strict
 docker compose exec app composer check-platform-reqs
+docker compose exec app composer audit --locked --abandoned=fail
+docker compose exec app npm audit --audit-level=low
 ```
 
 テストは SQLite のインメモリDBを使い、開発用 PostgreSQL のデータを変更しません。メールは標準で `src/storage/logs/laravel.log` に出力します。
 
-CI では同じ Dockerfile をビルドし、依存関係のインストール、型チェック付きビルド、PHPテスト、PostgreSQLマイグレーション、HTTP応答を検証します。
+CI では同じ Dockerfile をビルドし、依存関係のインストール、脆弱性監査、型チェック付きビルド、PHPテスト、PostgreSQLマイグレーション、HTTP応答を検証します。開発用依存も監査対象とし、npm は low 以上、Composer は既知の脆弱性または保守終了パッケージの検出で失敗させます。PR・main への push に加えて毎週月曜に実行し、手動実行もできます。
+
+Dependabot は npm・Composer・Dockerfile・Compose・GitHub Actions の更新PRを毎週作成します。自動マージは行いません。Docker の再ビルドでは `--pull` を付けてベースイメージを更新し、サービス側のイメージも更新する場合は `docker compose pull nginx postgres redis` を実行してください。依存監査はコンテナOSの脆弱性検査を含みません。
 
 ## 旧テンプレートから更新する場合
 
